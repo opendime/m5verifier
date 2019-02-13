@@ -286,7 +286,7 @@ read_binary_EP0(int cmd, int len, uint8_t *dest, uint16_t wIndex=0)
                     len, len, dest, NULL);
 
     if(rv) {
-        //Serial.printf("read_binary_EP0 failed: cmd=%d rv=0x%x\n", cmd, rv);
+        Serial.printf("read_binary_EP0 failed: cmd=%d rv=0x%x\n", cmd, rv);
 
         return rv;
     }
@@ -304,14 +304,14 @@ write_binary_EP0(char cmd, uint8_t *src, int len, uint16_t wIndex=0)
                 uint8_t wValLo, uint8_t wValHi,
                 uint16_t wInd, uint16_t total, uint16_t nbytes, uint8_t* dataptr, USBReadParser *p);
 */
-    Serial.printf("Write [%c] to EP0: %d (idx=%u)\n", len, cmd, wIndex);
+    Serial.printf("Write [%d] to EP0: '%c' (idx=%u)\n", len, cmd, wIndex);
 
     int rv = Usb.ctrlReq(od_usb_address, 0, 0x40, 0,
                     /*wValLo*/cmd, /*wValHi*/0, wIndex,
                     len, len, src, NULL);
 
     if(rv) {
-        Serial.printf("read_binary_EP0 failed: cmd=%d rv=0x%x\n", cmd, rv);
+        Serial.printf("write_binary_EP0 failed: cmd='%c' len=%d rv=0x%x\n", cmd, len, rv);
 
         return rv;
     }
@@ -470,6 +470,7 @@ Serial.println("done is seal");
 
             rv = read_binary_EP0(OD_GET_SIGN, sizeof(ae_resp), (uint8_t *)&ae_resp);
             if(rv == 0) {
+Serial.println("done");
                 break;
             }
         }
