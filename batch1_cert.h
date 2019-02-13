@@ -3,7 +3,7 @@
 // We can't query it over EP0 in that version, so we ship with a
 // copy here. Subject name is "Batch #1" inside.
 //
-static const char batch1_chain_crt[] = 
+static const char *batch1_chain_crt = 
 "-----BEGIN CERTIFICATE-----\n"
 "MIIDrTCCApWgAwIBAgIBATANBgkqhkiG9w0BAQsFADB4MQswCQYDVQQGEwJDQTEQ\n"
 "MA4GA1UECAwHT250YXJpbzEQMA4GA1UEBwwHVG9yb250bzEWMBQGA1UECgwNQ29p\n"
