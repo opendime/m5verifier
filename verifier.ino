@@ -7,6 +7,7 @@
 #include <mbedtls/ecdsa.h>
 
 #include "od_logo.h"
+#include "batch1_cert.h"
 
 const mbedtls_ecp_curve_info *btc_curve;
 const mbedtls_ecp_curve_info *nist_curve;
@@ -20,14 +21,18 @@ const int FONT_H = 10;       // height of tallest char, plus baseline skip
 const int BANNER_H = 85;
 const int STATUS_Y = 130;
 
+char unit_crt[1024];            // actually 960 max
+uint8_t chain_crt[4096];       // 6*512 = 3072 actual limit
+
 // Details for EP0 commands
-#define OD_GET_ADDR     3
-#define OD_GET_PRIVKEY  2
-#define OD_GET_SIGN     4
-#define OD_GET_CERT     7
-#define OD_GET_SERIAL   8
-#define OD_GET_CHAIN    11
-#define OD_GET_COIN     12
+#define OD_GET_PRIVKEY   2
+#define OD_GET_ADDR      3
+#define OD_GET_SIGN      4
+#define OD_GET_VERSION   6
+#define OD_GET_UNIT_CRT  7
+#define OD_GET_AE_SERIAL 8
+#define OD_GET_CHAIN_CRT 11
+#define OD_GET_COIN      12
 
 /*
  1 | Secret exponent (if unsealed) 
@@ -63,8 +68,6 @@ char od_privkey[64];
 bool od_is_verified = false;
 bool od_is_sealed = false;
 bool od_has_addr = false;
-char od_unit_crt[2048];
-char od_chain_crt[8196];
 
 void draw_banner()
 {
@@ -186,9 +189,36 @@ read_string_EP0(int cmd, int maxlen, char *dest)
         // - assume C-string type of response, not raw binary.
         int alen = strnlen(dest, maxlen);
         if(alen == maxlen) {
-            Serial.printf("Failed: cmd=%d rv=0x%x\n", cmd, rv);
+            Serial.printf("read_string_EP0 failed: cmd=%d rv=0x%x\n", cmd, rv);
             return rv;
         }
+    }
+
+    return 0;
+}
+
+// read_binary_EP0()
+//
+// Read a fixed-length set of bytes from device.
+//
+    int
+read_binary_EP0(int cmd, int len, uint8_t *dest, uint16_t wIndex=0)
+{
+/*
+    uint8_t ctrlReq(uint8_t addr, uint8_t ep, uint8_t bmReqType, uint8_t bRequest,
+                uint8_t wValLo, uint8_t wValHi,
+                uint16_t wInd, uint16_t total, uint16_t nbytes, uint8_t* dataptr, USBReadParser *p);
+*/
+    Serial.printf("Read [%d] from EP0: %d (idx=%u)\n", len, cmd, wIndex);
+
+    int rv = Usb.ctrlReq(od_usb_address, 0, 0xc0, 0,
+                    /*wValLo*/cmd, /*wValHi*/0, wIndex,
+                    len, len, dest, NULL);
+
+    if(rv) {
+        Serial.printf("read_binary_EP0 failed: cmd=%d rv=0x%x\n", cmd, rv);
+
+        return rv;
     }
 
     return 0;
@@ -202,29 +232,28 @@ void verify_opendime(UsbDevice *pdev)
     uint8_t rv;
 
     rv = Usb.getDevDescr(addr, 0, 0x12, ( uint8_t *)&buf);
-    if(rv) {
-    fail:
+    if(rv || (buf.idVendor != 0xd13e)) {
         draw_status("[not an opendime]");
         return;
     }
 
-    if(buf.idVendor != 0xd13e) goto fail;
-    // could also do if(buf.idProduct != 0x0100) goto fail;
+    // could also do (buf.idProduct != 0x0100) 
     // but let's be future-proof
-
     draw_status("(opendime)");
+
+    int i_serial = buf.iSerialNumber;
 
     // passable ... continue on assumption it's an opendime
     od_usb_address = addr;
 
     rv = read_string_EP0(OD_GET_ADDR, sizeof(od_address), od_address);
-    if(rv) return;
+    if(rv) goto fail;
 
     od_has_addr = (od_address[0] != 0);
     if(od_has_addr) {
         // see if unsealed
         rv = read_string_EP0(OD_GET_PRIVKEY, sizeof(od_privkey), od_privkey);
-        if(rv) return;
+        if(rv) goto fail;
 
         od_is_sealed = (od_privkey[0] == 0);
 
@@ -251,17 +280,94 @@ Serial.println("done is seal");
 
     // based on trustme.py ... 
 
-    // check serial number matches
-    draw_step("Serial number matches");
+    // read USB serial number, which is fixed 26-byte size
+    // - USC16 encoding, (le16), with prefix of length
+    uint8_t    encoded_serial[54];
+    rv = Usb.getStrDescr(od_usb_address, 0, sizeof(encoded_serial), i_serial, 0x0000, encoded_serial);
+    if(rv) goto fail;
+    if(encoded_serial[0] != 54) goto vfail;
 
-    // run a few bitcoin msg signings
-    draw_step("Good bitcoin message signature");
+    uint8_t    usb_serial[27];
+    for(int i=0; i<26; i++) {
+        usb_serial[i] = encoded_serial[2+(i*2)];
+    }
+    usb_serial[26] = 0;
+    Serial.printf("USB Serial: %s\n", usb_serial);
+
+    char    version[64];
+    rv = read_string_EP0(OD_GET_VERSION, sizeof(version), version);
+    if(rv) goto fail;
+
+    Serial.printf("Version: %s\n", version);
+    {   // just show up to first space of version.
+        char    tmp[80];
+
+        char *p = strchr(version, ' ');
+        if(!p) goto vfail;
+        *p = 0;
+
+        sprintf(tmp, "Version: %s", version);
+        draw_step(tmp);
+
+        sprintf(tmp, "Serial: %s", usb_serial);
+        draw_step(tmp);
+    }
+
+    if(od_has_addr) {
+        // run a few bitcoin msg signings
+        draw_step("Good bitcoin message signature");
+
+    }
+
+    // some older units can't do this part:
+    // - download unit and chain certificates (x.509, PEM, binary)
+
+    rv = read_string_EP0(OD_GET_UNIT_CRT, sizeof(unit_crt), unit_crt);
+    if(rv) goto fail;
+    Serial.printf("Unit:\n%s\n", unit_crt);
+
+    for(int off=0; off<sizeof(chain_crt); off += 512) {
+        rv = read_binary_EP0(OD_GET_CHAIN_CRT, 512, chain_crt+off, off/512);
+        if(rv) {
+            if(off == 0) {
+                // It doesn't have the endpoint... use our hard-coded chain for
+                // those early units.
+                if(strncmp(version, "2.0.0", 5) == 0) {
+                    strcpy((char*)chain_crt, batch1_chain_crt);
+                    break;
+                } else {
+                    goto vfail;
+                }
+            }
+
+            chain_crt[off] = 0;
+            break;
+        }
+    }
+    Serial.printf("Chain:\n%s\n", chain_crt);
 
     // downlaod unit crt, verify against factory chain, and also expected factory root
     draw_step("Genuine per-unit factory certificate");
 
     // extract AE pubkey from cert, use that to run a few AE508 msg signings
+
+    // need serial # of AE
+    uint8_t   ae_serial[6];
+    rv = read_binary_EP0(OD_GET_AE_SERIAL, sizeof(ae_serial), ae_serial);
+    if(rv) goto fail;
+
     draw_step("Passed anti-counterfeiting test");
+
+    return;
+
+fail:
+    Serial.printf("verify fail: rv=%d\n", rv);
+    draw_status("FAILED: Unable to communicate.");
+    return;
+
+vfail:
+    draw_status("FAILED: Verify failed.");
+    return;
 }
 
 void loop()
