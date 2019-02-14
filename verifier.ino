@@ -111,7 +111,10 @@ void setup()
     }
 }
 
-void draw_status(const char *msg, int color=TFT_WHITE)
+// draw_status()
+//
+    void
+draw_status(const char *msg, int color=TFT_WHITE)
 {
     M5.Lcd.fillRect(0, STATUS_Y, LCD_W, FONT_H, TFT_BLACK);
 
@@ -126,7 +129,10 @@ void draw_status(const char *msg, int color=TFT_WHITE)
     Serial.printf("Status: %s\n", msg);
 }
 
-void draw_step(const char *msg)
+// draw_step()
+//
+    void
+draw_step(const char *msg)
 {
     static int y;
     const int INDENT_X = 50;
@@ -220,7 +226,8 @@ read_binary_EP0(int cmd, int len, uint8_t *dest, uint16_t wIndex=0)
                     len, len, dest, NULL);
 
     if(rv) {
-        Serial.printf("read_binary_EP0 failed: cmd=%d rv=0x%x\n", cmd, rv);
+        // not always an error, expecting a stall (5) sometimes
+        //Serial.printf("read_binary_EP0 failed: cmd=%d rv=0x%x\n", cmd, rv);
 
         return rv;
     }
@@ -238,7 +245,7 @@ write_binary_EP0(char cmd, uint8_t *src, int len, uint16_t wIndex=0)
                 uint8_t wValLo, uint8_t wValHi,
                 uint16_t wInd, uint16_t total, uint16_t nbytes, uint8_t* dataptr, USBReadParser *p);
 */
-    Serial.printf("Write [%d] to EP0: '%c' (idx=%u)\n", len, cmd, wIndex);
+    //Serial.printf("Write [%d] to EP0: '%c' (idx=%u)\n", len, cmd, wIndex);
 
     int rv = Usb.ctrlReq(od_usb_address, 0, 0x40, 0,
                     /*wValLo*/cmd, /*wValHi*/0, wIndex,
@@ -357,11 +364,7 @@ Serial.println("done is seal");
         draw_step(tmp);
     }
 
-    if(od_has_addr) {
-        // run a few bitcoin msg signings
-        draw_step("Good bitcoin message signature");
 
-    }
 
     // some older units can't do this part:
     // - download unit and chain certificates (x.509, PEM, binary)
@@ -401,7 +404,7 @@ Serial.println("done is seal");
     // downlaod unit crt, verify against factory chain, and also expected factory root
     draw_step("Genuine per-unit factory certificate");
 
-    // Using pubkey extracted from cert, run a few AE508 test-msg signings (or maybe just one)
+    // Using pubkey extracted from cert, run a AE508 test-msg signing
     {
         uint8_t my_nonce[20];
         struct {
@@ -428,10 +431,35 @@ Serial.println("done is seal");
                                     ae_resp.sig, ae_resp.ae_nonce);
     }
     if(rv) goto vfail;
-
-    // verify signature, over appropriate msg
-
     draw_step("Passed anti-counterfeiting test");
+
+
+    if(od_has_addr) {
+        // verify bitcoin-style signature, over appropriate msg
+        uint8_t my_nonce[32];
+        uint8_t signature[65];
+
+        get_random_bytes(my_nonce, sizeof(my_nonce));
+            
+        rv = write_binary_EP0('m', my_nonce, sizeof(my_nonce));
+        if(rv) goto fail;
+
+        for(int i=0; i<20; i++) {
+            // sleep a bit ... it's delibrately slow
+            delay(50);
+
+            rv = read_binary_EP0(OD_GET_SIGN, sizeof(signature), signature);
+            if(rv == 0) {
+                break;
+            }
+        }
+
+        rv = verify_bitcoin_signature(my_nonce, od_address, signature, "BTC");  //XXX LTC
+        if(rv) goto vfail;
+
+        draw_step("Good bitcoin message signature");
+    }
+
 
     draw_status("-- TRUSTABLE --", TFT_GREEN);
 

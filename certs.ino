@@ -366,4 +366,41 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
     return rv;
 }
 
+// verify_bitcoin_signature()
+//
+    int
+verify_bitcoin_signature(const uint8_t my_nonce[32], const char *od_address,
+                            const uint8_t signature[65], const char *coin_type)
+{
+#if 0
+    mbedtls_sha256_context   ctx;
+    
+    mbedtls_sha256_init(&ctx); mbedtls_sha256_starts_ret(&ctx, 0);
+    const char *prefix;
+
+    if(coin_type[0] == 'L') {
+        prefix = "Litecoin Signed Message:\n";
+    } else {
+        prefix = "Bitcoin Signed Message:\n";
+    }
+
+    uint8_t pl = strlen(prefix);
+    mbedtls_sha256_update_ret(&ctx, &pl, 1);
+    mbedtls_sha256_update_ret(&ctx, prefix, pl);
+
+    uint8_t ml = 32;
+    mbedtls_sha256_update_ret(&ctx, &ml, 1);
+    mbedtls_sha256_update_ret(&ctx, my_nonce, 32);
+
+    uint8_t digest[32];
+    mbedtls_sha256_finish_ret(&ctx, digest);
+
+    // double-SHA256 
+    mbedtls_sha256_ret(digest, 32, digest, 0);
+#endif
+
+    return 0;
+    
+}
+
 // EOF
