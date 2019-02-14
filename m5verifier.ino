@@ -75,10 +75,10 @@ void draw_banner()
     //const uint16_t    od_color = 0xea52;        // M5.Lcd.color8to16(0xef4a4d);
     const uint16_t    od_color = M5.Lcd.color565(0xef, 0x4a, 0x4d);
     M5.Lcd.clear();
-    M5.Lcd.drawXBitmap(8, 4, od_logo_bits, od_logo_width, od_logo_height, od_color);
+    M5.Lcd.drawXBitmap(5, 4, od_logo_bits, od_logo_width, od_logo_height, od_color);
     M5.Lcd.setTextDatum(TL_DATUM);      // top left
     M5.Lcd.setTextSize(2);
-    M5.Lcd.drawString("Verifier", 96, 62);
+    M5.Lcd.drawString("Verifier", 10, 54);
 }
 
 void setup()
