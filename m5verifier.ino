@@ -91,6 +91,7 @@ void setup()
     Serial.println();
     Serial.println("Reboot.");
 
+#if 0
     // load appropriate curves
     btc_curve = mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256K1);
     assert(btc_curve);
@@ -103,6 +104,7 @@ void setup()
 
     // <https://github.com/ARMmbed/mbedtls/blob/fb1972db23da39bd11d4f9c9ea6266eee665605b/include/mbedtls/ecdsa.h#L200>
     // mbedtls_ecdsa_verify()
+#endif
 
     reset();
 
