@@ -14,6 +14,9 @@ const uint8_t factory_root_fingerprint[20] =  {
     0xA1, 0x02, 0x01, 0xE3, 0x02, 0x0E, 0xC9, 0x6B, 0x30, 0x90, 0x62,
     0x69, 0xCD, 0xE3, 0x6F, 0x82, 0x80, 0x35, 0xA9, 0x8B };
 
+// most recent unit
+static mbedtls_x509_crt    last_unit_crt;
+
 // lifted from mbedtls/library/ecdsa.c
 /*  
  * Convert a signature (given by context) to ASN.1
@@ -44,7 +47,8 @@ static int ecdsa_signature_to_asn1( const mbedtls_mpi *r, const mbedtls_mpi *s,
 // verify_unit_cert()
 //
     int
-verify_unit_cert(const char *chain_crt, const char *unit_crt, const char *usb_serial, const uint8_t ae_serial[6], mbedtls_pk_context *cert_pubkey)
+verify_unit_cert(const char *chain_crt, const char *unit_crt, const char *usb_serial,
+                    const uint8_t ae_serial[6])
 {
     // take a certificate chain back to the factory's root key, a per-unit certicate
     // and what we think the subject should be (serial numbers from product) and verify
@@ -53,40 +57,33 @@ verify_unit_cert(const char *chain_crt, const char *unit_crt, const char *usb_se
     uint32_t flags_out = 0;
 
     mbedtls_x509_crt    batch;
-    static mbedtls_x509_crt    unit;
     mbedtls_x509_crt_init(&batch);
-    mbedtls_x509_crt_init(&unit);
 
     mbedtls_x509_crl    empty_crl;
     mbedtls_x509_crl_init(&empty_crl);
 
+    if(last_unit_crt.version) {
+        // free resources from previous run
+        mbedtls_x509_crt_free(&last_unit_crt);
+    }
+    mbedtls_x509_crt_init(&last_unit_crt);
+
     rv = mbedtls_x509_crt_parse(&batch, (const uint8_t *)chain_crt, strlen(chain_crt)+1);
     if(rv) goto fail;
 
-    rv = mbedtls_x509_crt_parse(&unit, (const uint8_t *)unit_crt, strlen(unit_crt)+1);
+    rv = mbedtls_x509_crt_parse(&last_unit_crt, (const uint8_t *)unit_crt, strlen(unit_crt)+1);
     if(rv) goto fail;
 
     // check fingerprint of root cert. SHA-1 for historical reasons/openssl CLI compat.
     uint8_t digest[20];
     mbedtls_sha1_ret(batch.raw.p, batch.raw.len, digest);
     if(memcmp(digest, factory_root_fingerprint, sizeof(factory_root_fingerprint)) != 0) {
-        Serial.println("fact cert wrong");
+        Serial.println("Factory root cert wrong!\n");
         rv = 1;
         goto fail;
     }
-
-/*
-    Serial.printf("fing: len=%d %02x %02x %02x\n", factory->raw.len, digest[0], digest[1], digest[2]);
-
-    {   uint8_t tmp[2000];
-        size_t actual = 0;
-        mbedtls_base64_encode(tmp, sizeof(tmp), &actual, factory->raw.p, factory->raw.len);
-        tmp[actual] = 0;
-        Serial.println((char *)tmp);
-    }
-*/
     
-    rv = mbedtls_x509_crt_verify(&unit, &batch, &empty_crl, "Opendime", 
+    rv = mbedtls_x509_crt_verify(&last_unit_crt, &batch, &empty_crl, "Opendime", 
                      &flags_out, NULL, NULL);
     if(rv) goto fail;
 
@@ -96,45 +93,23 @@ verify_unit_cert(const char *chain_crt, const char *unit_crt, const char *usb_se
                 ae_serial[0], ae_serial[1], ae_serial[2],
                 ae_serial[3], ae_serial[4], ae_serial[5]);
 
-    // only now we can trust things!
+    // Only now we can trust contents of certificate.
+
     // - verify subject
     char subj[80];
-    mbedtls_x509_dn_gets(subj, sizeof(subj), &unit.subject);
-    Serial.printf("found: %s\n", subj);
+    mbedtls_x509_dn_gets(subj, sizeof(subj), &last_unit_crt.subject);
     if(strcmp(subj, expected_subj) != 0) {
-        Serial.printf("Unit cert is for some other unit!: '%s' != '%s'", subj, expected_subj);
-        rv = 3;
+        Serial.printf("Unit cert is for some other unit!: '%s' != '%s'\n", subj, expected_subj);
+        rv = 2;
         goto fail;
     }
     
-    // - extract pubkey
-    // unit.pk => mbedtls_pk_context
-    //*cert_pubkey = unit.pk;
-
-    {   uint8_t    buf[500];
-        // mbedtls_pk_context *ctx, unsigned char *buf, size_t size
-        int bl = mbedtls_pk_write_pubkey_der(&unit.pk, buf, sizeof(buf));
-        uint8_t *result = buf+500-bl;
-
-        uint8_t tmp[2000];
-        size_t actual = 0;
-        mbedtls_base64_encode(tmp, sizeof(tmp), &actual, result, bl);
-        tmp[actual] = 0;
-        Serial.printf("pubkey der = \n%s", (char *)tmp);
-
-        //int mbedtls_pk_parse_public_key( mbedtls_pk_context *ctx,
-                         //const unsigned char *key, size_t keylen );
-
-        rv = mbedtls_pk_parse_public_key(cert_pubkey, result, bl);
-        if(rv) goto fail;
-    }
-
-
+    // - extract pubkey ... but we'll just leave it where it is.
+    // last_unit_crt.pk => mbedtls_pk_context
 
 fail:
     mbedtls_x509_crl_free(&empty_crl);
     mbedtls_x509_crt_free(&batch);
-    //XXX//mbedtls_x509_crt_free(&unit);
 
     if(rv < 0) {
         char msg[128];
@@ -247,8 +222,7 @@ print_base64(const char *label, const uint8_t *src, int len)
     int
 verify_ae_signature(const uint8_t ae_serial[6], const char *usb_serial, 
                     const uint8_t my_nonce[20], const char *address,
-                    const uint8_t ae_sig[64], const uint8_t ae_nonce[32],
-                    mbedtls_pk_context *cert_pubkey)
+                    const uint8_t ae_sig[64], const uint8_t ae_nonce[32])
 {
 /* python
 def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
@@ -277,12 +251,14 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
     except BadSignatureError:
         ok = False
 */
+/*
     print_hex("ae_serial", ae_serial, 6);
     print_hex("my_nonce", my_nonce, 20);
     print_hex("ae_sig", ae_sig, 64);
     print_hex("ae_nonce", ae_nonce, 32);
     Serial.printf("usb_serial: %s\n", usb_serial);
     Serial.printf("address: %s\n", address);
+*/
 
     uint8_t slot13[32];
     uint8_t lock;
@@ -314,7 +290,7 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
 
     uint8_t m1tail[32];
     mbedtls_sha256_finish_ret(&ctx, m1tail);
-    print_hex("m1tail", m1tail, 32, ctx.total[0]);
+    //print_hex("m1tail", m1tail, 32, ctx.total[0]);
 
     // msg1 = slot14 + b'\x15\x02\x0e' + fixed + H(ae_rand + numin + b'\x16\0\0')
     mbedtls_sha256_init(&ctx);
@@ -327,7 +303,7 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
 
     uint8_t msg1[32];
     mbedtls_sha256_finish_ret(&ctx, msg1);
-    print_hex("msg1", msg1, 32, ctx.total[0]);
+    //print_hex("msg1", msg1, 32, ctx.total[0]);
     
     // msg2 = slot13 + b'\x15\x02\x0d' + fixed + H(msg1)
     mbedtls_sha256_init(&ctx);
@@ -340,7 +316,7 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
 
     uint8_t msg2[32];
     mbedtls_sha256_finish_ret(&ctx, msg2);
-    print_hex("msg2", msg2, 32, ctx.total[0]);
+    //print_hex("msg2", msg2, 32, ctx.total[0]);
 
     //body = H(msg2) + b'\x41\x40\x00\x00\x00\x00\x3c\x00\x2d\0\0\xEE' \
     //            + SN[2:6] + b'\x01\x23'+ SN[0:2] + lock + b'\0\0'
@@ -359,9 +335,9 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
 
     uint8_t digest[32];
     mbedtls_sha256_finish_ret(&ctx, digest);
-    print_hex("digest", digest, 32, ctx.total[0]);
+    //print_hex("digest", digest, 32, ctx.total[0]);
 
-    // mbedtls wants full ASN.1 formated signature (DER)
+    // CHALLENGE: mbedtls wants full ASN.1 formated signature (DER)
     // we have two 32-byte numbers: R, S
     // static int ecdsa_signature_to_asn1( const mbedtls_mpi *r, const mbedtls_mpi *s,
     //                              unsigned char *sig, size_t *slen )
@@ -376,14 +352,9 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
 
     int rv = ecdsa_signature_to_asn1(&r, &s, asn_sig, &a_len);
 
-    if(rv) goto fail;
-
-    print_base64("sig", asn_sig, a_len);
-
-    rv = mbedtls_pk_verify(cert_pubkey, MBEDTLS_MD_SHA256, digest, 32, asn_sig, a_len);
+    rv = mbedtls_pk_verify(&last_unit_crt.pk, MBEDTLS_MD_SHA256, digest, 32, asn_sig, a_len);
 
     if(rv < 0) {
-fail:
         char msg[128];
         mbedtls_strerror(rv, msg, sizeof(msg)); 
 

@@ -109,81 +109,15 @@ void setup()
     if(Usb.Init() == -1) {
         Serial.println("USB startup fail");
     }
-
-    {   
-        static const char *unit = "-----BEGIN CERTIFICATE-----\n\
-MIICbzCCAVegAwIBAgIIX3qDOWq5DPwwDQYJKoZIhvcNAQELBQAwFjEUMBIGA1UE\n\
-AwwLQmF0Y2ggIzMgQ0EwHhcNMTcxMjAxMDAwMDAwWhcNMzcwMTAxMDAwMDAwWjBF\n\
-MTAwLgYDVQQFEydJTlhCUkYyTEdSSUZDSUNLSklZREVDWUM3NCsxMzM1M2FiMzUz\n\
-YzUxETAPBgNVBAMMCE9wZW5kaW1lMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE\n\
-YlMHjcniY34vDrgTRCGiUQ2k4E6uiXOW/uCZxSwJeK7GwcgPqP0VN0NoNIRToReg\n\
-RvwNDSKurSB16ZgkhrtsSqNdMFswHwYDVR0jBBgwFoAUZajDuArucQE5AcGXIc80\n\
-k+fTXyEwCQYDVR0TBAIwADAdBgNVHQ4EFgQUjQYpvwL1xiSASEQJDmOAIYbIEVww\n\
-DgYDVR0PAQH/BAQDAgeAMA0GCSqGSIb3DQEBCwUAA4IBAQCTZc0l4AfLC+HCtm+G\n\
-FcyLZ7uKXOdoUL2yTCWwRwbY1owRcO5ve9NmhM4ajihSeiMVWGDUiRdEKHmJ5e58\n\
-Ge/rJEAyZF2DiT1L3yiY5Aa5sIqeWHXpWg2JmeGl3HePGId2TKM2HaTgTtIffITu\n\
-Jhb1ZMOwcbOZNTr4JAFROjlItuoUO0xvwvcrA0J9OglRPKK7mfv27/FuxzE7tPQo\n\
-8VGi7Zvor0qT7AJrdD2Ztd0WZ8WmJh60e0BXLB3ba1zVKxkWfwj31WTQUiEJOVxF\n\
-6Jl8yIJqvQftT11sbPx4eWAaRhMRBSDc40yfsMQw8E7dI80ChaPlxTEhK+34c0Pc\n\
-3G+7\n\
------END CERTIFICATE-----\n";
-        static const char *batch = "-----BEGIN CERTIFICATE-----\n\
-MIIDrTCCApWgAwIBAgIBATANBgkqhkiG9w0BAQsFADB4MQswCQYDVQQGEwJDQTEQ\n\
-MA4GA1UECAwHT250YXJpbzEQMA4GA1UEBwwHVG9yb250bzEWMBQGA1UECgwNQ29p\n\
-bmtpdGUgSW5jLjERMA8GA1UECwwIT3BlbmRpbWUxGjAYBgNVBAMMEUZhY3Rvcnkg\n\
-Um9vdCBDQSAxMB4XDTE3MDIwMTAwMDAwMFoXDTM3MDEwMTAwMDAwMFoweDELMAkG\n\
-A1UEBhMCQ0ExEDAOBgNVBAgMB09udGFyaW8xEDAOBgNVBAcMB1Rvcm9udG8xFjAU\n\
-BgNVBAoMDUNvaW5raXRlIEluYy4xETAPBgNVBAsMCE9wZW5kaW1lMRowGAYDVQQD\n\
-DBFGYWN0b3J5IFJvb3QgQ0EgMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC\n\
-ggEBAMKw2OjepDwxyqQGZkh519+snMHzI1eR6vrOInaKDmq2sTQE5x5PMoNdWEp6\n\
-f0V1L5e5YAfVfazu5L/d2GQDI2JIsCQGP7vYkqkGfFRAvzWPMiNrwNkPQymPFC5P\n\
-+2rRxAk+W9mTpjA0oZ6Xp5+B5oWTulGYygPleO6WxxKvxGEcD0WOZQqDmIRVIcCD\n\
-1DiEHqDWmHzRO6yUaHrM323iR/8RrkVSn288vcOUOHe3cG9LSWaMwBB+BtcyKGJf\n\
-i8fudSQdSQS75HkznFIs2E6f2tja42LmL+E37FftcbaAL8yvk5hqA8PWvkZ/1Foj\n\
-SJehAuMa/sHqRE1jdJeG4jCC3c8CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAd\n\
-BgNVHQ4EFgQUNEwRZVIzdnrWOFPw1B+vTWZAYOgwDgYDVR0PAQH/BAQDAgEGMA0G\n\
-CSqGSIb3DQEBCwUAA4IBAQC0h+a23N0gTQKMY7wCTGPsnupOkdA9fdL8jSoJF1sH\n\
-BoDtnftkw97FK+NJ7Wvl0gg1O9wiHyU+j2fP4M6k5iF+R8cg35jFNekMNizbR+Ey\n\
-8Lnp8kR9fn1tNzZS2UlaEX6k9EGWFvEq4PL4rSvbz7RSSCogQ4x7/5vGFjKYVluA\n\
-CVp1F4nYuzlB87ewBH9qU821y/3YcdbBdqb+U/EK1/JU1k29RitgNjg0AFu2Yj1f\n\
-oiGlcjWgMxJmTrlboJlal+adQY6G1f7vaD84hnHsRPnlJAkNQr5XannzTrxwZZQu\n\
-0oAwidheaTMUEiGDMRGCPhYvmP8DsasZwifPE5FNBi50\n\
------END CERTIFICATE-----\n\\n\
------BEGIN CERTIFICATE-----\n\
-MIIDbTCCAlWgAwIBAgICA+swDQYJKoZIhvcNAQELBQAweDELMAkGA1UEBhMCQ0Ex\n\
-EDAOBgNVBAgMB09udGFyaW8xEDAOBgNVBAcMB1Rvcm9udG8xFjAUBgNVBAoMDUNv\n\
-aW5raXRlIEluYy4xETAPBgNVBAsMCE9wZW5kaW1lMRowGAYDVQQDDBFGYWN0b3J5\n\
-IFJvb3QgQ0EgMTAeFw0xNzA3MDEwMDAwMDBaFw0zNzAxMDEwMDAwMDBaMBYxFDAS\n\
-BgNVBAMMC0JhdGNoICMzIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC\n\
-AQEAleDDk6GEInA5zU82NjgL3Sn0AWrX7hga0eebm447LZSaxFSNaX9AfVlBLiE4\n\
-EBLMC74rXyhvLSMq7+tT02SABaHz9CEbX9xh2TkOiV0nIc5fUIB7s4C4PLZ2hDTu\n\
-lRdXP3VfLaM1yoUSUcPbYAsbcW/T4+37nlHQEQA1+DHfyJkeyGz6jINC33SPXoPy\n\
-q8XrtuT7LZoWuf5hsn4aqEidgwcv5fT6lu4JyurOoYx7LE0ZFuohkKHWdVr8cnPy\n\
-ybJQqx20CowjZkjTrKPPiASLZ9su0YNjfidfzyxVV6acaWp/Q4MmNlGMCApI4MIu\n\
-k62Wkpruilo/RVq6xfz85WwL3wIDAQABo2MwYTAfBgNVHSMEGDAWgBQ0TBFlUjN2\n\
-etY4U/DUH69NZkBg6DAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRlqMO4Cu5x\n\
-ATkBwZchzzST59NfITAOBgNVHQ8BAf8EBAMCAQYwDQYJKoZIhvcNAQELBQADggEB\n\
-AI5XTuFeB+Gh9/h5xP3kRpBFgiik2rDRXvqSS2sGHZauQRhKpbg/PLyFC23qS6LC\n\
-IQElq108zgVU/8bOPyYDBgGADG00gB647U09QsKqPltQ/vXk14eJeHNkaz1tiGg0\n\
-YRmnyS28BCm0IrZO4AzbS8qexrkuT2OaAcDqUlMgNBgHgTAO573u1zbBgwKOKlWd\n\
-bY8i9SiPfTvE5bgaz4cAELkMnmgbjbtYLGH0Po39R+KGU6/yHTXRYebtBAn4Yp4s\n\
-mHh2QheqXuqehg0flzivQ5xOf7PU1MLdjRtypU/7Qh6TtdjvNjJLq75ZVAda14F1\n\
-n9DUlxgxfsboqYzjVFkmxYE=\n\
------END CERTIFICATE-----";
-
-        mbedtls_pk_context pubkey;
-        static const uint8_t ae_s[6] = { 0x13, 0x35, 0x3a, 0xb3, 0x53, 0xc5 };
-        verify_unit_cert(batch, unit, "INXBRF2LGRIFCICKJIYDECYC74", ae_s, &pubkey);
-    }
 }
 
-void draw_status(const char *msg, bool is_fail=false)
+void draw_status(const char *msg, int color=TFT_WHITE)
 {
     M5.Lcd.fillRect(0, STATUS_Y, LCD_W, FONT_H, TFT_BLACK);
 
     M5.Lcd.setTextDatum(TC_DATUM);      // top center
     M5.Lcd.setTextSize(1);
-    M5.Lcd.setTextColor(is_fail ? TFT_RED : TFT_WHITE);
+    M5.Lcd.setTextColor(color);
 
     M5.Lcd.drawString(msg, LCD_W/2, STATUS_Y);
 
@@ -331,7 +265,7 @@ verify_opendime(UsbDevice *pdev)
 
     rv = Usb.getDevDescr(addr, 0, 0x12, ( uint8_t *)&buf);
     if(rv || (buf.idVendor != 0xd13e)) {
-        draw_status("[not an opendime]", true);
+        draw_status("[not an opendime]", TFT_LIGHTGREY);
         return;
     }
 
@@ -462,9 +396,7 @@ Serial.println("done is seal");
     rv = read_binary_EP0(OD_GET_AE_SERIAL, sizeof(ae_serial), ae_serial);
     if(rv) goto fail;
 
-    mbedtls_pk_context cert_pubkey;
-    mbedtls_pk_init(&cert_pubkey);
-    if(verify_unit_cert(chain_crt, unit_crt, usb_serial, ae_serial, &cert_pubkey)) goto vfail;
+    if(verify_unit_cert(chain_crt, unit_crt, usb_serial, ae_serial)) goto vfail;
 
     // downlaod unit crt, verify against factory chain, and also expected factory root
     draw_step("Genuine per-unit factory certificate");
@@ -478,10 +410,6 @@ Serial.println("done is seal");
         } ae_resp = {};
 
         get_random_bytes(my_nonce, sizeof(my_nonce));
-
-        /*Serial.printf("My nonce: ");
-        for(int i=0; i<20; i++) Serial.printf(" %02x", my_nonce[i]);
-        Serial.println();*/
             
         rv = write_binary_EP0('f', my_nonce, sizeof(my_nonce));
         if(rv) goto fail;
@@ -497,7 +425,7 @@ Serial.println("done is seal");
         }
 
         rv = verify_ae_signature(ae_serial, usb_serial, my_nonce, od_address,
-                                    ae_resp.sig, ae_resp.ae_nonce, &cert_pubkey);
+                                    ae_resp.sig, ae_resp.ae_nonce);
     }
     if(rv) goto vfail;
 
@@ -505,15 +433,17 @@ Serial.println("done is seal");
 
     draw_step("Passed anti-counterfeiting test");
 
+    draw_status("-- TRUSTABLE --", TFT_GREEN);
+
     return;
 
 fail:
     Serial.printf("verify fail: rv=%d\n", rv);
-    draw_status("FAILED: Unable to communicate.", true);
+    draw_status("FAILED: Unable to communicate.", TFT_RED);
     return;
 
 vfail:
-    draw_status("FAILED: Verify failed.", true);
+    draw_status("FAILED: Verify failed.", TFT_RED);
     return;
 }
 
