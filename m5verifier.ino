@@ -79,12 +79,14 @@ void draw_banner()
     M5.Lcd.drawXBitmap(8, 18, od_logo_bits, od_logo_width, od_logo_height, od_color);
     M5.Lcd.setTextDatum(TL_DATUM);      // top left
     M5.Lcd.setTextSize(2);
+    M5.Lcd.setTextColor(TFT_WHITE);
     M5.Lcd.drawString("Verifier", 12, 72);
 
     M5.Lcd.setTextColor(od_color);
     M5.Lcd.setTextSize(1);
     M5.Lcd.setTextDatum(TR_DATUM);      // top left
-    M5.Lcd.drawString("(R)", 320-10, 64);
+    M5.Lcd.drawString("(R)", 320-10, 65);
+
 }
 
 void setup()
