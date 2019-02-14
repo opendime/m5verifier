@@ -72,13 +72,19 @@ bool od_has_addr = false;
 
 void draw_banner()
 {
-    const uint16_t    od_color = 0xF900;        // M5.Lcd.color8to16(0xef4a4d);
-    //const uint16_t    od_color = M5.Lcd.color565(0xef, 0x4a, 0x4d);
+    // see <http://www.barth-dev.de/online/rgb565-color-picker/>
+    const uint16_t    od_color = 0xF900;
+
     M5.Lcd.clear();
     M5.Lcd.drawXBitmap(8, 18, od_logo_bits, od_logo_width, od_logo_height, od_color);
     M5.Lcd.setTextDatum(TL_DATUM);      // top left
     M5.Lcd.setTextSize(2);
     M5.Lcd.drawString("Verifier", 12, 72);
+
+    M5.Lcd.setTextColor(od_color);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.setTextDatum(TR_DATUM);      // top left
+    M5.Lcd.drawString("(R)", 320-10, 64);
 }
 
 void setup()
