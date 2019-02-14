@@ -319,7 +319,10 @@ write_binary_EP0(char cmd, uint8_t *src, int len, uint16_t wIndex=0)
     return 0;
 }
 
-void verify_opendime(UsbDevice *pdev)
+// verify_opendime()
+//
+    void
+verify_opendime(UsbDevice *pdev)
 {
     uint8_t addr = pdev->address.devAddress;
 
@@ -334,12 +337,24 @@ void verify_opendime(UsbDevice *pdev)
 
     // could also do (buf.idProduct != 0x0100) 
     // but let's be future-proof
+
     draw_status("(opendime)");
 
     int i_serial = buf.iSerialNumber;
 
     // passable ... continue on assumption it's an opendime
     od_usb_address = addr;
+
+    // pick the only config supported.
+    rv = Usb.setConf(addr, 0, 1);
+    if(rv) goto fail;
+
+    // BUGFIX: Opendime EP0 takes 64 bytes packets (max), and some vendor 
+    // commands require at least 20/32 in a single transaction, so we cannot continue
+    // with default 8-byte writes to EP0. Really, when I pick the
+    // configuration, the epinfo should update to make the dev description.
+    //Serial.printf("ep0mpk = %d\n", pdev->epinfo[0].maxPktSize);       // prints 8
+    pdev->epinfo[0].maxPktSize = 64;
 
     rv = read_string_EP0(OD_GET_ADDR, sizeof(od_address), od_address);
     if(rv) goto fail;
@@ -448,6 +463,7 @@ Serial.println("done is seal");
     if(rv) goto fail;
 
     mbedtls_pk_context cert_pubkey;
+    mbedtls_pk_init(&cert_pubkey);
     if(verify_unit_cert(chain_crt, unit_crt, usb_serial, ae_serial, &cert_pubkey)) goto vfail;
 
     // downlaod unit crt, verify against factory chain, and also expected factory root
@@ -462,15 +478,20 @@ Serial.println("done is seal");
         } ae_resp = {};
 
         get_random_bytes(my_nonce, sizeof(my_nonce));
-        rv = write_binary_EP0('f', my_nonce, sizeof(my_nonce));
 
-        for(int i=0; i<100; i++) {
+        /*Serial.printf("My nonce: ");
+        for(int i=0; i<20; i++) Serial.printf(" %02x", my_nonce[i]);
+        Serial.println();*/
+            
+        rv = write_binary_EP0('f', my_nonce, sizeof(my_nonce));
+        if(rv) goto fail;
+
+        for(int i=0; i<20; i++) {
             // sleep a bit ... it's delibrately slow
             delay(50);
 
             rv = read_binary_EP0(OD_GET_SIGN, sizeof(ae_resp), (uint8_t *)&ae_resp);
             if(rv == 0) {
-Serial.println("done");
                 break;
             }
         }
