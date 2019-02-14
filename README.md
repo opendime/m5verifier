@@ -1,8 +1,8 @@
 # Get Yours!
 
-Alibaba has the M5Stack systems... many options. You'll need the USB one.
-
 [Visit Opendime.com](https://opendime.com) to get more Opendimes!
+
+Aliexpress has the M5Stack systems... many options and packages. You'll need the USB one.
 
 # Install
 
