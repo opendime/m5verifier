@@ -2,7 +2,8 @@
 
 [Visit Opendime.com](https://opendime.com) to get more Opendimes!
 
-Aliexpress has the M5Stack systems... many options and packages. You'll need the USB one.
+Aliexpress has the M5Stack systems... many options and packages. At a minimum, you'll need
+the "Basic" plus a "USB", but other combinations are possible.
 
 # Install
 
@@ -39,4 +40,13 @@ requires a setup process so the M5Stack can get a wifi password to
 use, and the interaction with a back-end service may reveal your
 location and/or identity plus it may tie you into future and pass
 applications of the specific Opendime.
+
+# TODO
+
+- initialize factory-fresh Opendimes with good entropy so they will pick a key
+- cycle through a few good third-part websites for balance URL's
+    - click for next site
+    - remember your favourite
+- display current balance on screen with help of Internet connection
+- improve bitcoin signed-message verification process
 

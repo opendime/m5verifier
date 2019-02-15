@@ -372,6 +372,8 @@ def verify_ae_signature(pubkey, expect, numin, ae_rand, sig):
 verify_bitcoin_signature(const uint8_t my_nonce[32], const char *od_address,
                             const uint8_t signature[65], const char *coin_type)
 {
+    // PROBLEM: mbedtls cannot determine the (4) public key of the signature. It only
+    // wants to work from the public key to the signature.
 #if 0
     mbedtls_sha256_context   ctx;
     
@@ -398,6 +400,11 @@ verify_bitcoin_signature(const uint8_t my_nonce[32], const char *od_address,
     // double-SHA256 
     mbedtls_sha256_ret(digest, 32, digest, 0);
 #endif
+
+    if(signature[0] != 27 && signature[0] != 28) {
+        // weak, very weak...
+        return 1;
+    }
 
     return 0;
     

@@ -10,8 +10,8 @@
 #include "batch1_cert.h"
 #include "certs.h"
 
-const mbedtls_ecp_curve_info *btc_curve;
-const mbedtls_ecp_curve_info *nist_curve;
+#define BALANCE_URL     "https://opendime.com/%s/balance/%s"
+#define BALANCE_LABEL     "opendime.com/~/%s"
 
 USB        Usb;
 USBHub     Hub(&Usb);
@@ -20,7 +20,7 @@ const int LCD_W = 320;
 const int LCD_H = 240;
 const int FONT_H = 10;       // height of tallest char, plus baseline skip
 const int BANNER_H = 85;
-const int STATUS_Y = 130;
+const int STATUS_Y = 132;
 
 char unit_crt[1024];            // actually 960 max
 char chain_crt[4096];       // 6*512 = 3072 actual limit
@@ -67,10 +67,15 @@ uint8_t od_usb_address = 0;
 char od_address[64];
 char od_privkey[64];
 bool od_is_verified = false;
-bool od_is_sealed = false;
+bool od_is_unsealed = false;
 bool od_has_addr = false;
+bool showing_qr = false;
+char coin_type[8];
 
-void draw_banner()
+// draw_banner()
+//
+    void
+draw_banner()
 {
     // see <http://www.barth-dev.de/online/rgb565-color-picker/>
     const uint16_t    od_color = 0xF900;
@@ -85,40 +90,25 @@ void draw_banner()
     M5.Lcd.setTextColor(od_color);
     M5.Lcd.setTextSize(1);
     M5.Lcd.setTextDatum(TR_DATUM);      // top left
-    M5.Lcd.drawString("(R)", 320-10, 65);
+    M5.Lcd.drawString("(R)", 320-10, 64);
 
 }
 
-void setup()
+// draw_buttons()
+//
+    void
+draw_buttons(const char *btnA, const char *btnB, const char *btnC)
 {
-    M5.begin();
-    draw_banner();
+    M5.Lcd.fillRect(0, LCD_H-FONT_H*2, LCD_W, FONT_H, TFT_BLACK);
 
-    Serial.begin(115200);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.setTextDatum(BC_DATUM);      // bottom center
 
-    Serial.println();
-    Serial.println("Reboot.");
-
-#if 0
-    // load appropriate curves
-    btc_curve = mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256K1);
-    assert(btc_curve);
-
-    nist_curve = mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256R1);
-    assert(nist_curve);
-    //Serial.print("nist_curve = %p", nist_curve);
-    //Serial.print("btc_curve = ");
-    //Serial.println((uint32_t)btc_curve, HEX);
-
-    // <https://github.com/ARMmbed/mbedtls/blob/fb1972db23da39bd11d4f9c9ea6266eee665605b/include/mbedtls/ecdsa.h#L200>
-    // mbedtls_ecdsa_verify()
-#endif
-
-    reset();
-
-    if(Usb.Init() == -1) {
-        Serial.println("USB startup fail");
-    }
+    const int y = LCD_H-8;
+    M5.Lcd.setTextColor(TFT_LIGHTGREY);
+    if(btnA) M5.Lcd.drawString(btnA, 64, y);
+    if(btnB) M5.Lcd.drawString(btnB, LCD_W/2, y);
+    if(btnC) M5.Lcd.drawString(btnC, 256, y);
 }
 
 // draw_status()
@@ -137,6 +127,42 @@ draw_status(const char *msg, int color=TFT_WHITE)
     M5.Lcd.setTextColor( TFT_WHITE);
 
     Serial.printf("Status: %s\n", msg);
+}
+
+void setup()
+{
+    M5.begin();
+    draw_banner();
+
+    Serial.begin(115200);
+
+    Serial.println();
+    Serial.println("Reboot.");
+
+#if 0
+    const mbedtls_ecp_curve_info *btc_curve;
+    const mbedtls_ecp_curve_info *nist_curve;
+
+    // load appropriate curves
+    btc_curve = mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256K1);
+    assert(btc_curve);
+
+    nist_curve = mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256R1);
+    assert(nist_curve);
+    //Serial.print("nist_curve = %p", nist_curve);
+    //Serial.print("btc_curve = ");
+    //Serial.println((uint32_t)btc_curve, HEX);
+
+    // <https://github.com/ARMmbed/mbedtls/blob/fb1972db23da39bd11d4f9c9ea6266eee665605b/include/mbedtls/ecdsa.h#L200>
+    // mbedtls_ecdsa_verify()
+#endif
+
+    reset();
+
+    if(Usb.Init() == -1) {
+        draw_status("USB startup fail", TFT_RED);
+        while(1) ;
+    }
 }
 
 // draw_step()
@@ -165,13 +191,18 @@ draw_step(const char *msg)
     Serial.printf("Step: %s\n", msg);
 }
 
-void reset()
+// reset()
+//
+    void
+reset()
 {
     memset(od_address, 0, sizeof(od_address));
     memset(od_privkey, 0, sizeof(od_privkey));
     od_is_verified = false;
-    od_is_sealed = false;
+    od_is_unsealed = false;
     od_has_addr = false;
+    showing_qr = false;
+    coin_type[0] = 0;
 }
 
 class AddressParser: public USBReadParser {
@@ -197,6 +228,7 @@ read_string_EP0(int cmd, int maxlen, char *dest)
     //Serial.printf("Read EP0: %d\n", cmd);
 
     memset(dest, 0, maxlen);
+
     int rv = Usb.ctrlReq(od_usb_address, 0, 0xc0, 0,
                     /*wValLo*/cmd, /*wValHi*/0, /*wIndex*/0,
                     maxlen, maxlen, (uint8_t *)dest, NULL);
@@ -205,7 +237,7 @@ read_string_EP0(int cmd, int maxlen, char *dest)
         // bitcoin addrs are 30-34 bytes, and we don't know exact length
         // the device returns right amount of bytes, and then stalls (to mark that)
         // - api here doesn't support that, and works but doesn't think it worked
-        // - expect stall here, and no certainty about length of transfer
+        // - so expect stall here, and no certainty about length of transfer
         // - assume C-string type of response, not raw binary.
         int alen = strnlen(dest, maxlen);
         if(alen == maxlen) {
@@ -311,26 +343,34 @@ verify_opendime(UsbDevice *pdev)
     if(rv) goto fail;
 
     od_has_addr = (od_address[0] != 0);
+
+    rv = read_string_EP0(OD_GET_COIN, sizeof(coin_type), coin_type);
+    if(rv || !coin_type[0]) {
+        // before version 2.2.0, all were Bitcoin, and didn't support endpt
+        strcpy(coin_type, "BTC");
+    }
+
     if(od_has_addr) {
         // see if unsealed
         rv = read_string_EP0(OD_GET_PRIVKEY, sizeof(od_privkey), od_privkey);
         if(rv) goto fail;
 
-        od_is_sealed = (od_privkey[0] == 0);
+        od_is_unsealed = (od_privkey[0] != 0);
 
         // show address while we work
+        M5.Lcd.setTextColor(TFT_WHITE);
         M5.Lcd.setTextDatum(TC_DATUM);      // top-center
         M5.Lcd.drawString(od_address, LCD_W/2, BANNER_H + (2*FONT_H));
 
-        if(!od_is_sealed) {
-Serial.println("is seal");
+        if(od_is_unsealed) {
             M5.Lcd.setTextSize(2);
-            M5.Lcd.drawString("* UNSEALED *", LCD_W/2, BANNER_H + (3*FONT_H), TFT_RED);
+            M5.Lcd.setTextColor(TFT_RED);
+            M5.Lcd.drawString("* UNSEALED *", LCD_W/2, BANNER_H + (3*FONT_H));
             M5.Lcd.setTextSize(1);
-Serial.println("done is seal");
         }
 
     } else {
+        M5.Lcd.setTextColor(TFT_WHITE);
         M5.Lcd.setTextDatum(TC_DATUM);      // top-center
         M5.Lcd.drawString("-- factory fresh --", LCD_W/2, BANNER_H + (2*FONT_H));
     }
@@ -338,6 +378,7 @@ Serial.println("done is seal");
     draw_status("Verifying...");
 
     draw_step(NULL);
+
 
     // based on trustme.py ... 
 
@@ -372,9 +413,11 @@ Serial.println("done is seal");
 
         sprintf(tmp, "Serial: %s", usb_serial);
         draw_step(tmp);
+
+        if(strcmp(coin_type, "LTC") == 0) {
+            draw_step("For Litecoin storage (not Bitcoin)");
+        }
     }
-
-
 
     // some older units can't do this part:
     // - download unit and chain certificates (x.509, PEM, binary)
@@ -464,7 +507,7 @@ Serial.println("done is seal");
             }
         }
 
-        rv = verify_bitcoin_signature(my_nonce, od_address, signature, "BTC");  //XXX LTC
+        rv = verify_bitcoin_signature(my_nonce, od_address, signature, coin_type);
         if(rv) goto vfail;
 
         draw_step("Good bitcoin message signature");
@@ -472,6 +515,13 @@ Serial.println("done is seal");
 
 
     draw_status("-- TRUSTABLE --", TFT_GREEN);
+    od_is_verified = true;
+
+    if(!od_has_addr) {
+        draw_buttons(NULL, "Setup", NULL);
+    } else {
+        draw_buttons(od_is_unsealed?"Key":NULL, "Links", "Address");
+    }
 
     return;
 
@@ -485,12 +535,31 @@ vfail:
     return;
 }
 
+// draw_qr()
+//
+    void
+draw_qr(const char *data, const char *subtext=NULL)
+{
+    M5.Lcd.clear();
+
+    showing_qr = true;
+
+    const int qsz = LCD_H-(FONT_H*2);
+    M5.Lcd.qrcode(data, (LCD_W-qsz)/2, 0, /*width*/qsz, /*version*/4);
+
+    M5.Lcd.setTextColor(TFT_LIGHTGREY);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.setTextDatum(TC_DATUM);
+    M5.Lcd.drawString(subtext?:data, LCD_W/2, qsz+2);
+}
+
 void loop()
 {
     static uint8_t last_state;
     const int y = 160;
 
     Usb.Task();
+    M5.update();
 
     uint8_t current_state = Usb.getUsbTaskState();
     if(current_state != last_state) {
@@ -508,5 +577,31 @@ void loop()
         }
 
         last_state = current_state;
+    }
+
+    if(showing_qr) {
+        if(M5.BtnA.wasReleased() || M5.BtnB.wasReleased() || M5.BtnC.wasReleased()) {
+        }
+    }
+
+    if(od_is_verified) {
+        if(M5.BtnA.wasReleased() && od_is_unsealed) {
+            // show the private key!
+            draw_qr(od_privkey);
+        } else if(M5.BtnB.wasReleased()) {
+            if(od_has_addr) {
+                static char url[200], label[200];
+                snprintf(url, sizeof(url), BALANCE_URL, coin_type, od_address);
+                snprintf(label, sizeof(label), BALANCE_LABEL, od_address);
+                draw_qr(url, label);
+            } else {
+                // start init process
+                draw_status("sorry! not yet");
+            }
+        } else if(M5.BtnC.wasReleased()) {
+            if(od_has_addr) {
+                draw_qr(od_address);
+            }
+        }
     }
 }
