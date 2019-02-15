@@ -11,7 +11,7 @@
 #include "certs.h"
 
 #define BALANCE_URL     "https://opendime.com/%s/balance/%s"
-#define BALANCE_LABEL     "opendime.com/~/%s"
+#define BALANCE_LABEL     "opendime.com ~ %s"
 
 USB        Usb;
 USBHub     Hub(&Usb);
@@ -538,7 +538,7 @@ vfail:
 // draw_qr()
 //
     void
-draw_qr(const char *data, const char *subtext=NULL)
+draw_qr(const char *data, const char *subtext, const char *warning)
 {
     M5.Lcd.clear();
 
@@ -551,6 +551,30 @@ draw_qr(const char *data, const char *subtext=NULL)
     M5.Lcd.setTextSize(1);
     M5.Lcd.setTextDatum(TC_DATUM);
     M5.Lcd.drawString(subtext?:data, LCD_W/2, qsz+2);
+
+    if(warning) {
+        M5.Lcd.setTextColor(TFT_RED);
+        M5.Lcd.setTextDatum(MC_DATUM);
+
+        const int x1 = 24;
+        int dy;
+
+        if(strlen(warning) <= 12) {
+            M5.Lcd.setTextSize(2);
+            dy = FONT_H * 2;
+        } else {
+            M5.Lcd.setTextSize(1);
+            dy = FONT_H;
+        }
+        int y = (LCD_H - (strlen(warning) * dy))/2;
+
+        for(int i=0; warning[i]; i++,  y += dy) {
+            char tmp[2] = { warning[i], 0};
+
+            M5.Lcd.drawString(tmp, x1, y);
+            M5.Lcd.drawString(tmp, LCD_W-x1, y);
+        }
+    }
 }
 
 void loop()
@@ -587,21 +611,23 @@ void loop()
     if(od_is_verified) {
         if(M5.BtnA.wasReleased() && od_is_unsealed) {
             // show the private key!
-            draw_qr(od_privkey);
+            draw_qr(od_privkey, NULL, "|| PRIVATE KEY ||");
         } else if(M5.BtnB.wasReleased()) {
             if(od_has_addr) {
                 static char url[200], label[200];
                 snprintf(url, sizeof(url), BALANCE_URL, coin_type, od_address);
                 snprintf(label, sizeof(label), BALANCE_LABEL, od_address);
-                draw_qr(url, label);
+                draw_qr(url, label, NULL);
             } else {
                 // start init process
                 draw_status("sorry! not yet");
             }
         } else if(M5.BtnC.wasReleased()) {
             if(od_has_addr) {
-                draw_qr(od_address);
+                draw_qr(od_address, NULL, od_is_unsealed?"*UNSEALED*":NULL);
             }
         }
     }
 }
+
+// EOF
