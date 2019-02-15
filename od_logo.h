@@ -1,3 +1,4 @@
+// % pngtopam banner.png | pamthreshold | pamtopnm | pbmtoxbm -name od_logo > od_logo.h
 #define od_logo_width 300
 #define od_logo_height 44
 static uint8_t od_logo_bits[] = {
