@@ -6,6 +6,8 @@ Aliexpress has the M5Stack systems... many options and packages.
 At a minimum, you'll need the "Basic" plus a "USB", but other
 combinations are possible.
 
+![pic](https://raw.githubusercontent.com/opendime/m5verifier/master/opendime-m5stack-verifier.png)
+
 # Install
 
 - install serial port drivers for CP2104 chip from Silicon Labs
